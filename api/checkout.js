@@ -44,10 +44,11 @@ export default async function handler(req, res) {
       '3:2':  { small: 0.5,  medium: 1.0, large: 1.55 },
       '1:1':  { small: 0.55, medium: 1.0, large: 1.6  },
     };
-    const FORMAT_MULT = { canvas: 1.0, 'fine-art': 0.55, poster: 0.30 };
+    const FORMAT_MULT = { canvas: 1.0, 'fine-art': 0.55, 'framed-poster': 0.65, poster: 0.30 };
     const FORMAT_NAME = {
       canvas: 'Gallery-wrap canvas',
       'fine-art': 'Fine Art giclée',
+      'framed-poster': 'Framed poster (pine wood frame)',
       poster: 'Premium matte poster',
     };
 
