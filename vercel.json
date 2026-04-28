@@ -2,6 +2,12 @@
   "version": 2,
   "cleanUrls": true,
   "trailingSlash": false,
+  "rewrites": [
+    { "source": "/preview", "destination": "/preview.html" },
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/success", "destination": "/success.html" },
+    { "source": "/cancel", "destination": "/cancel.html" }
+  ],
   "functions": {
     "api/**/*.js": {
       "maxDuration": 30
