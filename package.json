@@ -1,0 +1,14 @@
+{
+  "name": "artsison",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "artsison.com — print-on-demand gallery for young artists",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@vercel/postgres": "^0.9.0",
+    "stripe": "^14.21.0"
+  }
+}

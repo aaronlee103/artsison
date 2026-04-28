@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex,nofollow" />
+<title>artsison · admin</title>
+<style>
+  :root {
+    --bg:#f7f5f1;--ink:#1a1614;--muted:#6f6a62;--line:rgba(0,0,0,.1);
+    --accent:#1a1614;--card:#ffffff;--danger:#a8352a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font:15px/1.5 "Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  a{color:var(--ink)}
+  .wrap{max-width:1040px;margin:0 auto;padding:24px}
+  header{display:flex;align-items:center;justify-content:space-between;
+    padding:16px 24px;border-bottom:1px solid var(--line);background:#fff}
+  header h1{font-size:15px;margin:0;letter-spacing:.06em;text-transform:uppercase}
+  header nav{display:flex;gap:18px;font-size:13px}
+  header nav button{background:none;border:0;padding:0;color:var(--muted);cursor:pointer;
+    text-transform:uppercase;letter-spacing:.08em;font-size:12px}
+  header nav button.active{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:20px;margin-bottom:16px}
+  h2{font-size:18px;margin:0 0 14px;font-weight:500}
+  label{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 4px}
+  input,select,textarea{width:100%;border:1px solid var(--line);background:#fff;
+    padding:9px 10px;border-radius:6px;font:inherit;color:var(--ink)}
+  textarea{resize:vertical;min-height:64px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px}
+  .row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:10px}
+  @media (max-width:640px){.row,.row-3{grid-template-columns:1fr}}
+  button.primary{background:var(--ink);color:#fff;border:0;padding:10px 16px;
+    border-radius:6px;cursor:pointer;font:inherit;letter-spacing:.04em}
+  button.secondary{background:#fff;color:var(--ink);border:1px solid var(--line);
+    padding:8px 12px;border-radius:6px;cursor:pointer;font:inherit}
+  button.danger{color:var(--danger);background:#fff;border:1px solid var(--danger);
+    padding:6px 10px;border-radius:6px;cursor:pointer;font:inherit;font-size:12px}
+  .muted{color:var(--muted)}
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;
+    border:1px solid var(--line);color:var(--muted);margin-right:6px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .chip{width:18px;height:18px;border-radius:50%;border:1px solid var(--line)}
+  .login{max-width:380px;margin:80px auto;padding:28px;background:#fff;
+    border:1px solid var(--line);border-radius:12px}
+  .err{color:var(--danger);font-size:13px;margin:6px 0}
+  .ok{color:#2a7a2a;font-size:13px;margin:6px 0}
+  .status-pill{padding:2px 8px;border-radius:4px;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  .s-pending{background:#f0ece0;color:#6a5a30}
+  .s-paid,.s-submitted,.s-in_production,.s-shipped,.s-delivered{background:#dde9d8;color:#2a5a2a}
+  .s-failed,.s-paid_hold{background:#f0dcd6;color:#8a2a1a}
+  details{border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:#fafaf7}
+  details + details{margin-top:6px}
+  summary{cursor:pointer;font-weight:500}
+  .split{display:grid;grid-template-columns:1fr 320px;gap:16px}
+  @media (max-width:900px){.split{grid-template-columns:1fr}}
+  .variant-grid{display:grid;grid-template-columns:120px 1fr 1fr auto;gap:6px;
+    align-items:center;font-size:13px}
+  .variant-grid input{padding:6px 8px;font-size:13px}
+  @media (max-width:700px){.variant-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel" data-type="module">
+const { useState, useEffect, useMemo } = React;
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    ...opts,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const text = await res.text();
+  let data; try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+  if (!res.ok) throw Object.assign(new Error(data.error || `HTTP ${res.status}`), { status: res.status, data });
+  return data;
+}
+
+function Login({ onLogin }) {
+  const [password, setPassword] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true); setErr('');
+    try { await api('/api/admin/login', { method: 'POST', body: { password } }); onLogin(); }
+    catch (e) { setErr(e.message || 'Login failed'); }
+    finally { setBusy(false); }
+  }
+  return (
+    <div className="login">
+      <h2 style={{marginTop:0}}>artsison · admin</h2>
+      <p className="muted">Enter the admin password.</p>
+      <form onSubmit={submit}>
+        <input type="password" value={password} autoFocus
+          onChange={(e)=>setPassword(e.target.value)} placeholder="password" />
+        {err && <div className="err">{err}</div>}
+        <button className="primary" style={{marginTop:12}} disabled={busy}>
+          {busy?'…':'Sign in'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+const FORMATS = ['canvas','fine-art','poster'];
+const SIZES = ['small','medium','large'];
+
+function ArtworkEditor({ artwork, artists, onSaved, onDelete }) {
+  const [draft, setDraft] = useState(() => ({ ...artwork }));
+  const [variants, setVariants] = useState([]);
+  const [vLoaded, setVLoaded] = useState(false);
+  const [msg, setMsg] = useState('');
+  const isNew = !artwork.id;
+
+  useEffect(() => {
+    if (artwork.id) {
+      api(`/api/artworks/${artwork.id}`).then((r) => {
+        setVariants(r.variants || []); setVLoaded(true);
+      }).catch(() => setVLoaded(true));
+    } else { setVLoaded(true); }
+  }, [artwork.id]);
+
+  function set(k, v) { setDraft((d) => ({ ...d, [k]: v })); }
+
+  async function save() {
+    try {
+      const payload = {
+        ...draft,
+        price: parseInt(draft.price, 10) || 0,
+        sort_order: parseInt(draft.sort_order, 10) || 0,
+        palette: typeof draft.palette === 'string'
+          ? draft.palette.split(',').map((s) => s.trim()).filter(Boolean)
+          : (draft.palette || []),
+        stops: typeof draft.stops === 'string' ? JSON.parse(draft.stops || '[]') : (draft.stops || []),
+      };
+      if (isNew) {
+        const r = await api('/api/artworks', { method: 'POST', body: payload });
+        setMsg('Created ' + r.id); onSaved && onSaved();
+      } else {
+        await api(`/api/artworks/${artwork.id}`, { method: 'PUT', body: payload });
+        setMsg('Saved'); onSaved && onSaved();
+      }
+    } catch (e) { setMsg(e.message); }
+  }
+
+  async function upsertVariant(v) {
+    try {
+      await api('/api/admin/variants', { method: 'PUT', body: { ...v, artwork_id: artwork.id } });
+      const r = await api(`/api/artworks/${artwork.id}`);
+      setVariants(r.variants || []);
+    } catch (e) { setMsg(e.message); }
+  }
+
+  function variantFor(format, size_id) {
+    return variants.find((v) => v.format === format && v.size_id === size_id) || { format, size_id, product_uid: '', print_url: '' };
+  }
+
+  return (
+    <div className="card">
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <h2 style={{margin:0}}>{isNew ? 'New artwork' : draft.title}</h2>
+        {!isNew && <button className="danger" onClick={() => onDelete(artwork.id)}>Delete</button>}
+      </div>
+      <div className="row">
+        <div><label>ID</label>
+          <input value={draft.id || ''} onChange={(e)=>set('id', e.target.value)} disabled={!isNew} /></div>
+        <div><label>Title</label>
+          <input value={draft.title || ''} onChange={(e)=>set('title', e.target.value)} /></div>
+      </div>
+      <div className="row">
+        <div><label>Artist</label>
+          <select value={draft.artist_id || ''} onChange={(e)=>set('artist_id', e.target.value)}>
+            <option value="">—</option>
+            {artists.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select></div>
+        <div><label>Year</label>
+          <input value={draft.year || ''} onChange={(e)=>set('year', e.target.value)} /></div>
+      </div>
+      <div className="row-3">
+        <div><label>Aspect</label>
+          <select value={draft.aspect || '3:4'} onChange={(e)=>set('aspect', e.target.value)}>
+            <option>3:4</option><option>4:3</option><option>3:2</option><option>1:1</option>
+          </select></div>
+        <div><label>Base price (Medium Canvas, USD)</label>
+          <input type="number" value={draft.price ?? 0} onChange={(e)=>set('price', e.target.value)} /></div>
+        <div><label>Sort order</label>
+          <input type="number" value={draft.sort_order ?? 0} onChange={(e)=>set('sort_order', e.target.value)} /></div>
+      </div>
+      <div className="row">
+        <div><label>Medium (original)</label>
+          <input value={draft.medium || ''} onChange={(e)=>set('medium', e.target.value)} placeholder="Oil on linen, 60 × 80 cm" /></div>
+        <div><label>Origin</label>
+          <input value={draft.origin || ''} onChange={(e)=>set('origin', e.target.value)} /></div>
+      </div>
+      <div className="row">
+        <div><label>Edition</label>
+          <input value={draft.edition || ''} onChange={(e)=>set('edition', e.target.value)} /></div>
+        <div><label>Published</label>
+          <select value={String(draft.published ?? true)} onChange={(e)=>set('published', e.target.value === 'true')}>
+            <option value="true">Yes</option><option value="false">No</option>
+          </select></div>
+      </div>
+      <label>Description</label>
+      <textarea value={draft.description || ''} onChange={(e)=>set('description', e.target.value)} />
+      <label style={{marginTop:10}}>Palette (comma-separated hex)</label>
+      <input value={Array.isArray(draft.palette) ? draft.palette.join(', ') : (draft.palette || '')}
+        onChange={(e)=>set('palette', e.target.value)} placeholder="#1e3a2c, #3d5a3a, #7a9a5a" />
+      <label style={{marginTop:10}}>Gradient stops (JSON array of {"{c,p}"})</label>
+      <textarea value={typeof draft.stops === 'string' ? draft.stops : JSON.stringify(draft.stops || [], null, 0)}
+        onChange={(e)=>set('stops', e.target.value)} />
+      <div style={{display:'flex',gap:8,marginTop:12,alignItems:'center'}}>
+        <button className="primary" onClick={save}>Save</button>
+        {msg && <span className="muted">{msg}</span>}
+      </div>
+
+      {!isNew && vLoaded && (
+        <details style={{marginTop:16}}>
+          <summary>Gelato product UIDs &amp; print URLs ({variants.length} overrides)</summary>
+          <div style={{marginTop:8,display:'grid',gap:6}}>
+            {FORMATS.flatMap((f) => SIZES.map((s) => {
+              const v = variantFor(f, s);
+              return (
+                <VariantRow key={`${f}:${s}`} format={f} size={s} initial={v}
+                  onSave={(payload) => upsertVariant(payload)} />
+              );
+            }))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function VariantRow({ format, size, initial, onSave }) {
+  const [uid, setUid] = useState(initial.product_uid || '');
+  const [url, setUrl] = useState(initial.print_url || '');
+  useEffect(() => { setUid(initial.product_uid || ''); setUrl(initial.print_url || ''); },
+    [initial.product_uid, initial.print_url]);
+  return (
+    <div className="variant-grid">
+      <div><span className="pill">{format}</span><span className="pill">{size}</span></div>
+      <input placeholder="Gelato product UID" value={uid} onChange={(e)=>setUid(e.target.value)} />
+      <input placeholder="https://…/print-file.tif" value={url} onChange={(e)=>setUrl(e.target.value)} />
+      <button className="secondary" onClick={()=>onSave({ format, size_id: size, product_uid: uid, print_url: url })}>Save</button>
+    </div>
+  );
+}
+
+function ArtistEditor({ artist, onSaved, onDelete }) {
+  const [draft, setDraft] = useState({ ...artist });
+  const [msg, setMsg] = useState('');
+  const isNew = !artist.id;
+  function set(k, v) { setDraft((d) => ({ ...d, [k]: v })); }
+  async function save() {
+    try {
+      if (isNew) await api('/api/artists', { method: 'POST', body: draft });
+      else await api(`/api/artists/${artist.id}`, { method: 'PUT', body: draft });
+      setMsg('Saved'); onSaved && onSaved();
+    } catch (e) { setMsg(e.message); }
+  }
+  return (
+    <div className="card">
+      <div style={{display:'flex',justifyContent:'space-between'}}>
+        <h2 style={{margin:0}}>{isNew ? 'New artist' : draft.name}</h2>
+        {!isNew && <button className="danger" onClick={()=>onDelete(artist.id)}>Delete</button>}
+      </div>
+      <div className="row">
+        <div><label>ID</label><input value={draft.id || ''} disabled={!isNew}
+          onChange={(e)=>set('id', e.target.value)} /></div>
+        <div><label>Name</label><input value={draft.name || ''}
+          onChange={(e)=>set('name', e.target.value)} /></div>
+      </div>
+      <div className="row">
+        <div><label>Location</label><input value={draft.location || ''}
+          onChange={(e)=>set('location', e.target.value)} /></div>
+        <div><label>Year</label><input value={draft.year || ''}
+          onChange={(e)=>set('year', e.target.value)} /></div>
+      </div>
+      <label>Short bio</label>
+      <input value={draft.short_bio || ''} onChange={(e)=>set('short_bio', e.target.value)} />
+      <label style={{marginTop:10}}>Long bio</label>
+      <textarea value={draft.long_bio || ''} onChange={(e)=>set('long_bio', e.target.value)} />
+      <div style={{display:'flex',gap:8,marginTop:12}}>
+        <button className="primary" onClick={save}>Save</button>
+        {msg && <span className="muted">{msg}</span>}
+      </div>
+    </div>
+  );
+}
+
+function ArtworksTab() {
+  const [list, setList] = useState([]);
+  const [artists, setArtists] = useState([]);
+  const [editing, setEditing] = useState(null);
+  async function refresh() {
+    const r = await api('/api/artworks?all=1'); setList(r.artworks || []);
+    const a = await api('/api/artists'); setArtists(a.artists || []);
+  }
+  useEffect(() => { refresh(); }, []);
+  async function del(id) {
+    if (!confirm('Delete this artwork?')) return;
+    await api(`/api/artworks/${id}`, { method: 'DELETE' });
+    setEditing(null); refresh();
+  }
+  return (
+    <div className="split">
+      <div>
+        <div className="card">
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+            <h2 style={{margin:0}}>Artworks</h2>
+            <button className="secondary" onClick={()=>setEditing({ aspect:'3:4', price:115, published:true, palette:[], stops:[] })}>+ New</button>
+          </div>
+          <table><thead><tr><th>#</th><th>Title</th><th>Artist</th><th>Aspect</th><th>$</th><th></th></tr></thead>
+            <tbody>
+              {list.map((a) => (
+                <tr key={a.id} style={{cursor:'pointer'}}>
+                  <td>{a.sort_order}</td>
+                  <td onClick={()=>setEditing(a)}>{a.title}{!a.published && <span className="pill" style={{marginLeft:6}}>hidden</span>}</td>
+                  <td onClick={()=>setEditing(a)}>{a.artist_name || '—'}</td>
+                  <td onClick={()=>setEditing(a)}>{a.aspect}</td>
+                  <td onClick={()=>setEditing(a)}>{a.price}</td>
+                  <td><button className="secondary" onClick={()=>setEditing(a)}>Edit</button></td>
+                </tr>
+              ))}
+            </tbody></table>
+        </div>
+      </div>
+      <div>
+        {editing && (
+          <ArtworkEditor key={editing.id || 'new'} artwork={editing} artists={artists}
+            onSaved={refresh} onDelete={del} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ArtistsTab() {
+  const [list, setList] = useState([]);
+  const [editing, setEditing] = useState(null);
+  async function refresh() { const r = await api('/api/artists'); setList(r.artists || []); }
+  useEffect(() => { refresh(); }, []);
+  async function del(id) {
+    if (!confirm('Delete artist?')) return;
+    await api(`/api/artists/${id}`, { method: 'DELETE' });
+    setEditing(null); refresh();
+  }
+  return (
+    <div className="split">
+      <div className="card">
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+          <h2 style={{margin:0}}>Artists</h2>
+          <button className="secondary" onClick={()=>setEditing({})}>+ New</button>
+        </div>
+        <table><thead><tr><th>Name</th><th>Location</th><th></th></tr></thead>
+          <tbody>{list.map((a) => (
+            <tr key={a.id} onClick={()=>setEditing(a)} style={{cursor:'pointer'}}>
+              <td>{a.name}</td><td>{a.location}</td>
+              <td><button className="secondary" onClick={(e)=>{e.stopPropagation();setEditing(a);}}>Edit</button></td>
+            </tr>
+          ))}</tbody></table>
+      </div>
+      {editing && <ArtistEditor key={editing.id || 'new'} artist={editing} onSaved={refresh} onDelete={del} />}
+    </div>
+  );
+}
+
+function OrdersTab() {
+  const [list, setList] = useState([]);
+  const [msg, setMsg] = useState('');
+  async function refresh() {
+    try { const r = await api('/api/orders'); setList(r.orders || []); }
+    catch (e) { setMsg(e.message); }
+  }
+  useEffect(() => { refresh(); }, []);
+
+  async function submit(id) {
+    setMsg('Submitting…');
+    try { await api(`/api/orders/${id}`, { method: 'POST', body: { action: 'gelato-submit' } });
+      setMsg('Submitted to Gelato'); refresh(); }
+    catch (e) { setMsg('Error: ' + e.message); }
+  }
+  async function setStatus(id, status) {
+    try { await api(`/api/orders/${id}`, { method: 'POST', body: { action: 'set-status', status } }); refresh(); }
+    catch (e) { setMsg(e.message); }
+  }
+
+  return (
+    <div className="card">
+      <h2 style={{marginTop:0}}>Orders {msg && <span className="muted" style={{fontSize:13,fontWeight:400}}>· {msg}</span>}</h2>
+      {list.length === 0 && <p className="muted">No orders yet.</p>}
+      {list.map((o) => (
+        <details key={o.id} style={{marginBottom:8}}>
+          <summary>
+            <code>{o.id}</code>{' '}
+            <span className={`status-pill s-${o.status}`}>{o.status}</span>{' '}
+            · ${o.total} · {o.customer_email || '—'} · {new Date(o.created_at).toLocaleString()}
+          </summary>
+          <div style={{marginTop:8,fontSize:13}}>
+            <div className="muted">Stripe session: {o.stripe_session_id || '—'}</div>
+            <div className="muted">Gelato order: {o.gelato_order_id || '—'}</div>
+            {o.shipping_address && (
+              <div style={{marginTop:6}}>
+                <strong>Ship to:</strong> {o.shipping_address.firstName} {o.shipping_address.lastName},{' '}
+                {o.shipping_address.addressLine1} {o.shipping_address.addressLine2},{' '}
+                {o.shipping_address.city} {o.shipping_address.postCode}, {o.shipping_address.country}
+              </div>
+            )}
+            {o.notes && <div style={{marginTop:6,color:'#a8352a'}}>{o.notes}</div>}
+            <table style={{marginTop:8}}>
+              <thead><tr><th>Artwork</th><th>Fmt</th><th>Size</th><th>Qty</th><th>$</th><th>Gelato UID</th></tr></thead>
+              <tbody>{(o.items || []).map((it) => (
+                <tr key={it.id}>
+                  <td>{it.artwork_title}<div className="muted" style={{fontSize:11}}>{it.artist_name}</div></td>
+                  <td>{it.format}</td><td>{it.size_name}</td>
+                  <td>{it.quantity}</td><td>{it.unit_price}</td>
+                  <td style={{fontSize:11}}>{it.product_uid || <span style={{color:'#a8352a'}}>missing</span>}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+            <div style={{display:'flex',gap:6,marginTop:10,flexWrap:'wrap'}}>
+              <button className="primary" onClick={() => submit(o.id)}>Submit to Gelato</button>
+              <button className="secondary" onClick={() => setStatus(o.id, 'shipped')}>Mark shipped</button>
+              <button className="secondary" onClick={() => setStatus(o.id, 'delivered')}>Mark delivered</button>
+              <button className="secondary" onClick={() => setStatus(o.id, 'refunded')}>Mark refunded</button>
+            </div>
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+function SetupTab() {
+  const [msg, setMsg] = useState('');
+  async function run(seed) {
+    setMsg('Running…');
+    try {
+      const r = await api('/api/admin/migrate', { method: 'POST', body: { seed } });
+      setMsg('OK · seeded=' + !!r.seeded);
+    } catch (e) { setMsg(e.message); }
+  }
+  return (
+    <div className="card">
+      <h2 style={{marginTop:0}}>Setup</h2>
+      <p className="muted">Run once after provisioning Vercel Postgres.</p>
+      <div style={{display:'flex',gap:8}}>
+        <button className="primary" onClick={()=>run(false)}>Run migrations</button>
+        <button className="secondary" onClick={()=>run(true)}>Run + seed demo catalog</button>
+      </div>
+      {msg && <div style={{marginTop:10}}>{msg}</div>}
+      <h3 style={{marginTop:24}}>Required env vars (set in Vercel)</h3>
+      <ul className="muted" style={{fontSize:13,lineHeight:1.7}}>
+        <li><code>POSTGRES_URL</code> (auto-set by Vercel Postgres)</li>
+        <li><code>ADMIN_PASSWORD</code> — this login password</li>
+        <li><code>SESSION_SECRET</code> — any long random string</li>
+        <li><code>STRIPE_SECRET_KEY</code> / <code>STRIPE_WEBHOOK_SECRET</code></li>
+        <li><code>GELATO_API_KEY</code> (optional — orders flow manually until set)</li>
+        <li><code>SITE_URL</code> — e.g. <code>https://artsison.com</code></li>
+      </ul>
+    </div>
+  );
+}
+
+function App() {
+  const [auth, setAuth] = useState(null);
+  const [tab, setTab] = useState('artworks');
+
+  useEffect(() => {
+    api('/api/admin/me').then((r) => setAuth(!!r.authenticated)).catch(() => setAuth(false));
+  }, []);
+
+  async function logout() {
+    await api('/api/admin/login', { method: 'DELETE' });
+    setAuth(false);
+  }
+
+  if (auth === null) return <div className="wrap"><p className="muted">Loading…</p></div>;
+  if (!auth) return <Login onLogin={() => setAuth(true)} />;
+
+  return (
+    <>
+      <header>
+        <h1>artsison · admin</h1>
+        <nav>
+          {['artworks','artists','orders','setup'].map((t) => (
+            <button key={t} className={tab===t?'active':''} onClick={()=>setTab(t)}>{t}</button>
+          ))}
+          <button onClick={logout}>sign out</button>
+        </nav>
+      </header>
+      <div className="wrap">
+        {tab === 'artworks' && <ArtworksTab />}
+        {tab === 'artists' && <ArtistsTab />}
+        {tab === 'orders' && <OrdersTab />}
+        {tab === 'setup' && <SetupTab />}
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
