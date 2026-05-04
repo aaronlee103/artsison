@@ -481,7 +481,7 @@ function App() {
   const [tab, setTab] = useState('artworks');
 
   useEffect(() => {
-    api('/api/admin/me').then((r) => setAuth(!!r.authenticated)).catch(() => setAuth(false));
+    api('/api/admin/login').then((r) => setAuth(!!r.authenticated)).catch(() => setAuth(false));
   }, []);
 
   async function logout() {
